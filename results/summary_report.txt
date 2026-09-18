@@ -1,0 +1,29 @@
+Authors with TC=0 (no article reaches H): 1
+  - AuthorID=R_7ZDrzI8AulpsGix | NArticles=1 | NReachedH=0 | TF=0.0 | TDMean=inf | TYMean=inf | TCMean=0.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+
+Authors with no triangle position (xMean/yMean empty): 11
+  - AuthorID=R_1CyzoGr8deBYFQf | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=2.0 | TYMean=8.0 | TCMean=0.5 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_1EgLtX4FPdztzIr | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=3.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_1LjPfMwLOxgmMmo | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=3.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_1dMlJiNA4dMOvG5 | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=2.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_2E02cgEDo6RDsOW | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=1.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_3HBOUHtkbqMUKBM | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=1.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_3NOoDVezb6Sprqg | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=1.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_3jTE1vOo46OEwxF | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=3.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_7ZDrzI8AulpsGix | NArticles=1 | NReachedH=0 | TF=0.0 | TDMean=inf | TYMean=inf | TCMean=0.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_ZIYWrzvNlXtNrSV | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=5.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+  - AuthorID=R_bC3CE8Fc9VkZ53r | NArticles=1 | NReachedH=1 | TF=1.0 | TDMean=1.0 | TYMean=1.0 | TCMean=1.0 | TIMean=(empty) | xMean=(empty) | yMean=(empty)
+
+UNCATEGORIZED articles: 6
+  - ScopusID=82955192103 | PMID=21886608 | DOI=10.3389/fnana.2011.00051
+  - ScopusID=84866370563 | PMID=21949503 | DOI=10.3389/fnmol.2011.00022
+  - ScopusID=79959222357 | PMID=21629747 | DOI=10.4061/2011/479249
+  - ScopusID=82055176824 | PMID=22654559 | DOI=10.2174/138920211798120826
+  - ScopusID=84992415757 | PMID=25961273 | DOI=10.1515/HMBCI.2011.113
+  - ScopusID=84874344548 | PMID=22654839 | DOI=10.3389/fendo.2011.00104
+
+NOT_FOUND articles (never resolved in Scopus/PubMed): 4
+  - ScopusID=79952245491 | PMID=(no PMID) | DOI=10.1016/j.trac.2011.01.006
+  - ScopusID=84865404711 | PMID=(no PMID) | DOI=10.3233/978-1-60750-793-2-295
+  - ScopusID=80054715352 | PMID=(no PMID) | DOI=10.1016/j.jss.2011.06.034
+  - ScopusID=79960700337 | PMID=(no PMID) | DOI=10.1016/j.angio.2011.04.001

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<Title>Translational triangle by researcher</Title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  #layout { display: flex; gap: 24px; align-items: flex-start; }
+  #controls { margin-bottom: 12px; }
+  #modeButtons { margin-bottom: 14px; }
+  #modeButtons button {
+    padding: 6px 14px; font-size: 14px; cursor: pointer;
+    border: 1px solid #888; background: #eee; border-radius: 4px 0 0 4px;
+  }
+  #modeButtons button:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+  #modeButtons button.active { background: #4a90d9; color: white; border-color: #2a6cb0; }
+
+  #topNRow, #searchRow { display: none; }
+  #topNRow.visible, #searchRow.visible { display: block; }
+
+  #controls label { font-size: 14px; }
+  #chart { width: 900px; height: 900px; }
+  #searchResult { font-size: 13px; color: #555; margin-top: 4px; min-height: 18px; }
+  input[type="text"] { padding: 4px 8px; font-size: 14px; width: 220px; }
+  input[type="range"] { width: 220px; }
+  #searchBox { display: flex; gap: 6px; align-items: center; }
+  #searchBox button, #clearBtn { padding: 4px 10px; font-size: 14px; cursor: pointer; }
+  #selectedList { margin-top: 8px; max-width: 500px; }
+  .chip {
+    display: inline-block; background: #eee; border: 1px solid #bbb; border-radius: 12px;
+    padding: 2px 6px 2px 10px; margin: 2px; font-size: 12px;
+  }
+  .chip button {
+    border: none; background: none; cursor: pointer; font-size: 13px; margin-left: 4px; color: #900;
+  }
+  #clearRow { margin-top: 8px; }
+
+  #colorbarPanel { width: 90px; margin-top: 60px; }
+  #colorbarTitle { font-size: 12px; font-weight: bold; text-align: center; margin-bottom: 8px; }
+  #noTcInfo { font-size: 12px; color: #333; text-align: center; margin-top: 14px; max-width: 90px; }
+  #grayBox {
+    width: 14px; height: 14px; background: #b0b0b0; border: 1px solid #888;
+    display: inline-block; vertical-align: middle; margin-right: 4px;
+  }
+  #noPositionBanner {
+    font-size: 14px; color: #333; background: #eef5fc; border-left: 4px solid #4a90d9;
+    padding: 10px 14px; margin-bottom: 16px; max-width: 700px;
+  }
+</style>
+</head>
+<body>
+  <h2>Translational triangle by researcher</h2>
+  <div id="noPositionBanner">11 researcher(s) out of 80 are not shown in the triangle: they have no valid (x, y) position, because all of their articles are UNCATEGORIZED or NOT_FOUND (see summary_report.txt for the list).</div>
+  <div id="controls">
+    <div id="modeButtons">
+      <button id="modeTopNBtn" class="active">Top N mode (slider)</button>
+      <button id="modeSearchBtn">Manual selection mode</button>
+    </div>
+
+    <div id="topNRow" class="visible">
+      <label for="topN">Researchers shown (by number of articles): <b id="topNValue">20</b> / 69</label><br>
+      <input type="range" id="topN" min="1" max="69" value="20">
+    </div>
+
+    <div id="searchRow">
+      <label for="search">Add researcher (AuthorID or AuthorNumber):</label>
+      <div id="searchBox">
+        <input type="text" id="search" placeholder="e.g. R_1QoTo7UY8J o 118">
+        <button id="addBtn">Add</button>
+      </div>
+      <div id="searchResult"></div>
+      <div id="selectedList"></div>
+      <div id="clearRow">
+        <button id="clearBtn">Deselect all</button>
+      </div>
+    </div>
+  </div>
+  <div id="layout">
+    <div id="chart"></div>
+    <div id="colorbarPanel">
+      <div id="colorbarTitle">Mean TC<br>(Translational<br>Closeness)</div>
+      <div style="position: relative; height: 320px; width: 24px; margin: 0 auto;">
+        <div style="width: 24px; height: 320px; background: linear-gradient(to top, #662D91 0%, #EC008C 20%, #ED1C24 40%, #F7941D 60%, #FFF200 80%, #39B54A 100%); border: 1px solid #888;"></div>
+        <div class="colorbarTick" style="position:absolute; top:100.0%; left:30px; transform: translateY(-50%); font-size:11px;">0</div>
+<div class="colorbarTick" style="position:absolute; top:91.1%; left:30px; transform: translateY(-50%); font-size:11px;">0.2</div>
+<div class="colorbarTick" style="position:absolute; top:74.7%; left:30px; transform: translateY(-50%); font-size:11px;">0.4</div>
+<div class="colorbarTick" style="position:absolute; top:53.5%; left:30px; transform: translateY(-50%); font-size:11px;">0.6</div>
+<div class="colorbarTick" style="position:absolute; top:28.4%; left:30px; transform: translateY(-50%); font-size:11px;">0.8</div>
+<div class="colorbarTick" style="position:absolute; top:0.0%; left:30px; transform: translateY(-50%); font-size:11px;">1.0</div>
+      </div>
+      <div id="noTcInfo">
+        <span id="grayBox"></span>TC=0: n=1
+      </div>
+    </div>
+  </div>
+
+<script>
+const DATA = [{"id": 3, "name": "R_1KRh4hJD9WSrsC9", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 0.0, "tf": 1.0, "color": "#39b54a"}, {"id": 4, "name": "R_1Ks4wyJRSBZS361", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 5, "name": "R_1LT0nn1E8TdU3Dy", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 7, "name": "R_1PcKy6BiB7ZxI6g", "x": 0.8660254037844387, "y": -0.5, "n_articles": 3.0, "tc": 1.0, "td": 1.0, "ty": 0.3333333333333333, "tf": 1.0, "color": "#39b54a"}, {"id": 8, "name": "R_1PdA9MQ7EvCxCNM", "x": 0.0, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 3.0, "tf": 1.0, "color": "#39b54a"}, {"id": 9, "name": "R_1QLC8QNjb1ovdKy", "x": 0.0, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 11, "name": "R_1dbQAzNiqKELdSa", "x": 0.8660254037844386, "y": -0.5, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 0.0, "tf": 1.0, "color": "#39b54a"}, {"id": 12, "name": "R_1gADk8ssxz07txF", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 13, "name": "R_1jImwD3GXrpfYrE", "x": -0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 14, "name": "R_1pROXWiMeJqeeFS", "x": -0.21650635094610965, "y": 0.125, "n_articles": 3.0, "tc": 1.0, "td": 1.0, "ty": 3.3333333333333335, "tf": 1.0, "color": "#39b54a"}, {"id": 15, "name": "R_1rv3uXELh2JgBjs", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 16, "name": "R_21A1xy3xHCP530Y", "x": 0.0, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 5.0, "tf": 1.0, "color": "#39b54a"}, {"id": 17, "name": "R_21AqWeoTDeYCaGp", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 3.0, "tf": 1.0, "color": "#39b54a"}, {"id": 18, "name": "R_242kz23UYqDQHmm", "x": -0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 0.5, "td": 2.0, "ty": 3.0, "tf": 1.0, "color": "#ed153c"}, {"id": 19, "name": "R_24w3cMwGL6BPAYo", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 20, "name": "R_29oI8L5RwlgHjte", "x": -0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 5.0, "tf": 1.0, "color": "#39b54a"}, {"id": 21, "name": "R_2Beu9kcftbqIbNC", "x": 0.4330127018922193, "y": -0.5, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 0.5, "tf": 1.0, "color": "#39b54a"}, {"id": 23, "name": "R_2E9JfezahHLaSzD", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 4.0, "tf": 1.0, "color": "#39b54a"}, {"id": 24, "name": "R_2P8aL7JdUlooXb5", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 0.5, "td": 2.0, "ty": 3.0, "tf": 1.0, "color": "#ed153c"}, {"id": 25, "name": "R_2PgHHBXzKQJU5gq", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 0.0, "tf": 1.0, "color": "#39b54a"}, {"id": 26, "name": "R_2TNxHa7BvD94Dl3", "x": 0.0, "y": -0.5, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 3.0, "tf": 1.0, "color": "#39b54a"}, {"id": 27, "name": "R_2TYuFwataEFCCQ6", "x": 0.21650635094610965, "y": 0.125, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 2.5, "tf": 1.0, "color": "#39b54a"}, {"id": 28, "name": "R_2U4949NtIn0aKKE", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 0.5, "td": 2.0, "ty": 3.0, "tf": 1.0, "color": "#ed153c"}, {"id": 29, "name": "R_2V7N9VxU5DbyyiK", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 30, "name": "R_2YsoiE32J6WoxU1", "x": -0.21650635094610965, "y": 0.125, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 2.5, "tf": 1.0, "color": "#39b54a"}, {"id": 31, "name": "R_2aLUnrZ1SKUjPFv", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 32, "name": "R_2c7pJwAlmMI37Zc", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 33, "name": "R_2z5VgVMRgaQ3A2p", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 34, "name": "R_2zeX8pzuhnqQz50", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 35, "name": "R_306qXbX9GFayZNG", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 3.0, "tf": 1.0, "color": "#39b54a"}, {"id": 36, "name": "R_31oVGLEX40l6u3v", "x": -0.21650635094610965, "y": 0.125, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 3.0, "tf": 1.0, "color": "#39b54a"}, {"id": 38, "name": "R_3HSpxbm7gUZnV7t", "x": -0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 9.0, "tf": 1.0, "color": "#39b54a"}, {"id": 39, "name": "R_3HztxEZK5AOhfD3", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 41, "name": "R_3NPzZTMoajd5wVt", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 3.0, "tf": 1.0, "color": "#39b54a"}, {"id": 42, "name": "R_3RgYgsidGN4joPq", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 2.0, "tf": 1.0, "color": "#39b54a"}, {"id": 43, "name": "R_3RwqY82BRoNv5h8", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 6.0, "tf": 1.0, "color": "#39b54a"}, {"id": 44, "name": "R_3e4be1lSrsDjQsM", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 45, "name": "R_3iRwPKA90URv178", "x": 0.0, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 47, "name": "R_3jxLveddhWvzFux", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 0.5, "td": 2.0, "ty": 12.0, "tf": 1.0, "color": "#ed153c"}, {"id": 48, "name": "R_3koFtnDTxO190Up", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 49, "name": "R_3kp7BmouRxNKyFK", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 5.0, "tf": 1.0, "color": "#39b54a"}, {"id": 50, "name": "R_3m7AsyBBGW1sdbq", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 2.0, "tf": 1.0, "color": "#39b54a"}, {"id": 51, "name": "R_3oFLquJRAGGbgYB", "x": 0.4330127018922193, "y": -0.5, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 1.5, "tf": 1.0, "color": "#39b54a"}, {"id": 52, "name": "R_3oO7H0ZdAvZxKqW", "x": 0.4330127018922193, "y": -0.375, "n_articles": 4.0, "tc": 1.0, "td": 1.0, "ty": 0.75, "tf": 1.0, "color": "#39b54a"}, {"id": 53, "name": "R_3pope1H7LqvZ2CN", "x": 0.43301270189221935, "y": -0.08333333333333333, "n_articles": 3.0, "tc": 1.0, "td": 1.0, "ty": 1.3333333333333333, "tf": 1.0, "color": "#39b54a"}, {"id": 54, "name": "R_3ptIStwz66ucN81", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 55, "name": "R_3r1i0cDwDSeiv1o", "x": -0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 9.0, "tf": 1.0, "color": "#39b54a"}, {"id": 56, "name": "R_3sB8NsMfvYKRw5p", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 4.0, "tf": 1.0, "color": "#39b54a"}, {"id": 57, "name": "R_3szzl5qdO4IygeB", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 58, "name": "R_6fMn6sgH6HzEbf3", "x": 0.0, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 59, "name": "R_7UMuEjO5LIwVyIV", "x": 0.0, "y": 1.0, "n_articles": 1.0, "tc": 0.5, "td": 2.0, "ty": 3.0, "tf": 1.0, "color": "#ed153c"}, {"id": 60, "name": "R_7VEPRsIzKOq01wZ", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 62, "name": "R_AA8tabbKU8tdU0p", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 0.5, "td": 2.0, "ty": 2.0, "tf": 1.0, "color": "#ed153c"}, {"id": 63, "name": "R_OdNaULRcFgRGv6N", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 4.0, "tf": 1.0, "color": "#39b54a"}, {"id": 64, "name": "R_OjppIgqjEbuNlHH", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 65, "name": "R_R8kOskzIrpYDbJD", "x": 0.8660254037844386, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 2.0, "tf": 1.0, "color": "#39b54a"}, {"id": 66, "name": "R_SJinKD4TGqvoXex", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 67, "name": "R_UEelXkoGa4Vcvjr", "x": 0.0, "y": -0.25, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 0.5, "tf": 1.0, "color": "#39b54a"}, {"id": 68, "name": "R_WCdTdC6s4PolPxv", "x": 0.0, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 69, "name": "R_WxPUJdOinQ1FQeB", "x": 0.21650635094610965, "y": 0.125, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 2.5, "tf": 1.0, "color": "#39b54a"}, {"id": 72, "name": "R_bCNoOc4heErkMiR", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 0.5, "td": 2.0, "ty": 2.0, "tf": 1.0, "color": "#ed153c"}, {"id": 73, "name": "R_cIUihlhLoQyk1k5", "x": 0.649519052838329, "y": -0.125, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 74, "name": "R_dmsfHMN8HPgd79v", "x": 0.4330127018922193, "y": 0.25, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 2.0, "tf": 1.0, "color": "#39b54a"}, {"id": 75, "name": "R_pizlxhr6zDEFfkR", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 2.0, "tf": 1.0, "color": "#39b54a"}, {"id": 76, "name": "R_pxyP5Wleq8sOnKN", "x": 0.0, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 1.0, "tf": 1.0, "color": "#39b54a"}, {"id": 77, "name": "R_scmttKhnvJjJcnT", "x": 0.0, "y": -0.5, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 0.0, "tf": 1.0, "color": "#39b54a"}, {"id": 78, "name": "R_vMmBstfCX3m56nv", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 1.0, "td": 1.0, "ty": 0.0, "tf": 1.0, "color": "#39b54a"}, {"id": 79, "name": "R_wRipgHE7S3haP97", "x": 0.21650635094610965, "y": 0.125, "n_articles": 2.0, "tc": 1.0, "td": 1.0, "ty": 2.5, "tf": 1.0, "color": "#39b54a"}, {"id": 80, "name": "R_xFyNPo3wxOaZIB3", "x": 0.0, "y": 0.0, "n_articles": 1.0, "tc": 0.5, "td": 2.0, "ty": 12.0, "tf": 1.0, "color": "#ed153c"}];
+const VERTICES = { A: [-0.8660254037844386, -0.5], C: [0.0, 1.0], H: [0.8660254037844386, -0.5] };
+let selected = [];
+let mode = "topN"; // "topN" | "search"
+
+function triangleShapeTrace() {
+  return {
+    x: [VERTICES.A[0], VERTICES.C[0], VERTICES.H[0], VERTICES.A[0]],
+    y: [VERTICES.A[1], VERTICES.C[1], VERTICES.H[1], VERTICES.A[1]],
+    mode: "lines", line: {color: "black", width: 1.5},
+    hoverinfo: "skip", showlegend: false,
+  };
+}
+
+function hoverText(d) {
+  return "AuthorID: " + d.name +
+    "<br>AuthorNumber: " + d.id +
+    "<br>NArticles: " + d.n_articles +
+    "<br>TF: " + (d.tf === null ? "-" : d.tf) +
+    "<br>TDMean: " + (d.td === null ? "-" : d.td) +
+    "<br>TYMean: " + (d.ty === null ? "-" : d.ty) +
+    "<br>TCMean: " + (d.tc === null ? "-" : d.tc);
+}
+
+const MIN_PX = 5.0, MAX_PX = 90.0;
+function sizeFor(d, maxN) {
+  const frac = maxN > 0 ? Math.sqrt(d.n_articles / maxN) : 0;
+  return MIN_PX + frac * (MAX_PX - MIN_PX);
+}
+
+function setMode(newMode) {
+  mode = newMode;
+  document.getElementById("modeTopNBtn").classList.toggle("active", mode === "topN");
+  document.getElementById("modeSearchBtn").classList.toggle("active", mode === "search");
+  document.getElementById("topNRow").classList.toggle("visible", mode === "topN");
+  document.getElementById("searchRow").classList.toggle("visible", mode === "search");
+  render();
+}
+
+function findMatches(query) {
+  query = query.trim().toLowerCase();
+  if (!query) return [];
+  return DATA.filter(d =>
+    String(d.id).toLowerCase() === query ||
+    (d.name && d.name.toLowerCase().includes(query))
+  );
+}
+
+function addSelected() {
+  const query = document.getElementById("search").value;
+  const matches = findMatches(query);
+  const resultEl = document.getElementById("searchResult");
+  if (matches.length === 0) {
+    resultEl.textContent = 'No researcher found for "' + query + '".';
+    return;
+  }
+  matches.forEach(m => {
+    if (!selected.some(s => s.id === m.id)) selected.push(m);
+  });
+  document.getElementById("search").value = "";
+  resultEl.textContent = "";
+  renderSelectedList();
+  render();
+}
+
+function removeSelected(id) {
+  selected = selected.filter(d => d.id !== id);
+  renderSelectedList();
+  render();
+}
+
+function clearSelected() {
+  selected = [];
+  renderSelectedList();
+  render();
+}
+
+function renderSelectedList() {
+  const container = document.getElementById("selectedList");
+  container.innerHTML = "";
+  selected.forEach(d => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = d.name + " (ID " + d.id + ")";
+    const btn = document.createElement("button");
+    btn.textContent = "×";
+    btn.onclick = () => removeSelected(d.id);
+    chip.appendChild(btn);
+    container.appendChild(chip);
+  });
+}
+
+function render() {
+  const sorted = [...DATA].sort((a, b) => b.n_articles - a.n_articles);
+  const maxN = sorted.length ? sorted[0].n_articles : 1;
+
+  let shown;
+  if (mode === "search") {
+    shown = [...selected];
+  } else {
+    const topN = parseInt(document.getElementById("topN").value, 10);
+    document.getElementById("topNValue").textContent = topN;
+    shown = sorted.slice(0, topN);
+  }
+
+  const trace = {
+    x: shown.map(d => d.x), y: shown.map(d => d.y),
+    mode: "markers+text",
+    text: mode === "search" ? shown.map(d => String(d.id)) : [],
+    textposition: "middle center",
+    textfont: {size: 11, color: "black"},
+    marker: {
+      size: shown.map(d => sizeFor(d, maxN)),
+      color: shown.map(d => d.color),
+      line: {width: 0.5, color: "rgba(0,0,0,0.3)"},
+      opacity: 0.85,
+    },
+    hovertext: shown.map(hoverText), hoverinfo: "text", showlegend: false,
+  };
+
+  const layout = {
+    xaxis: {visible: false, scaleanchor: "y", scaleratio: 1},
+    yaxis: {visible: false},
+    plot_bgcolor: "white", width: 900, height: 900,
+    margin: {t: 40, b: 40, l: 40, r: 40},
+    annotations: [
+      {x: VERTICES.A[0], y: VERTICES.A[1], text: "<b>A</b>", showarrow: false, font: {size: 18}, xshift: -14},
+      {x: VERTICES.C[0], y: VERTICES.C[1], text: "<b>C</b>", showarrow: false, font: {size: 18}, yshift: 14},
+      {x: VERTICES.H[0], y: VERTICES.H[1], text: "<b>H</b>", showarrow: false, font: {size: 18}, xshift: 14},
+    ],
+  };
+
+  Plotly.react("chart", [triangleShapeTrace(), trace], layout, {displayModeBar: true});
+}
+
+document.getElementById("modeTopNBtn").addEventListener("click", () => setMode("topN"));
+document.getElementById("modeSearchBtn").addEventListener("click", () => setMode("search"));
+document.getElementById("topN").addEventListener("input", render);
+document.getElementById("addBtn").addEventListener("click", addSelected);
+document.getElementById("search").addEventListener("keydown", (e) => { if (e.key === "Enter") addSelected(); });
+document.getElementById("clearBtn").addEventListener("click", clearSelected);
+render();
+</script>
+</body>
+</html>
