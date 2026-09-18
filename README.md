@@ -277,3 +277,9 @@ Both the Scopus and PubMed APIs enforce request limits. As soon as either one re
 ## Reference
 
 Weber, G. M. (2013). *Identifying translational science within the triangle of biomedicine.* AMIA Summits on Translational Science Proceedings. (See `Identifying translational science within the triangle of biomedicine - Weber (2013).pdf` in the project root.)
+
+---
+
+<p align="center">
+  <img src="assets/momentum-footer.png" alt="Marta Benítez Hernández — Proyecto MOMENTUM — INGENIO (CSIC–UPV) — mbenher1@upcnet.upv.es — Universitat Politècnica de València, Camino de Vera, s/n, 46022, Valencia — Ministerio de Ciencia, Innovación y Universidades, CSIC, Universitat Politècnica de València, Ingenio (CSIC-UPV), MaX" width="480">
+</p>
