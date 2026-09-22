@@ -46,9 +46,10 @@ import time
 from pathlib import Path
 from typing import Optional, Union
 from xml.etree import ElementTree as ET
-from .data_io import read_csv_clean, to_csv_clean
+from .data_io import InputError, read_csv_clean, to_csv_clean
 
 import pandas as pd
+import requests
 
 from .mesh_classification import classify_mesh_codes, get_mesh_tree_numbers, load_mesh_indices
 from .scopus_to_pmid import (
@@ -73,6 +74,73 @@ _NS = {
 _MAX_GENERATIONS = 4
 
 DOI_ESEARCH_BATCH_SIZE = 40  # DOIs per OR query (a conservative URL-length limit)
+
+# Columns this function itself reads directly from papers_full_csv
+# (ScopusID/Year via row.get() further down would silently turn every
+# row into SKIPPED_INVALID_ROW if the column were missing entirely
+# rather than just empty per row; PMID is read with df["PMID"], which
+# would raise a raw KeyError if missing). Checked up front so a wrong
+# --resume-forward path fails with one clear message instead of either
+# of those two confusing outcomes.
+_PAPERS_FULL_REQUIRED_COLUMNS = ("ScopusID", "Year", "PMID", "Category")
+
+# Columns the resume logic reads from an existing citations_details.csv
+# (see the "if resume and detail_csv_path.exists():" block in
+# compute_forward_citations): ScopusID/Generation/CitingNodeID are read
+# with prev["..."]/r["..."] (would raise a raw KeyError if missing);
+# the rest are read with r.get(...)/prow.get(...) (would silently just
+# come back None), but are checked here too so that pointing
+# --citations-details at some other, unrelated CSV by mistake is caught
+# up front instead of silently producing empty/garbage reuse caches.
+_CITATIONS_DETAILS_REQUIRED_COLUMNS = (
+    "ScopusID", "PMID", "Generation", "ParentNodeID", "ParentPMID",
+    "ParentScopusID", "CitingNodeID", "CitingScopusID", "CitingDOI",
+    "CitingPMID", "CitingYear", "CitingMeSHList", "CitingMeSHTerms",
+    "CitingMeSHTreeNumbers", "CitingCategory", "PathToH",
+)
+
+
+def _read_csv_clean_validated(path: Path, required_columns: tuple, what: str) -> pd.DataFrame:
+    """
+    Reads a CSV with read_csv_clean and checks it looks like the kind of
+    file it is expected to be, raising a clear InputError -- instead of
+    letting the pipeline either crash later with a confusing KeyError or
+    silently carry on with missing/garbage data -- in either of these
+    cases:
+      - the file does not exist at `path` at all (e.g. a typo in
+        --resume-forward or --citations-details);
+      - the file exists but is not a valid, readable CSV (e.g. it is
+        actually some other file type);
+      - it reads fine as a CSV, but is missing one of the columns listed
+        in `required_columns` (e.g. --citations-details was pointed, by
+        mistake, at some unrelated CSV).
+
+    Args:
+        path: path of the CSV to read.
+        required_columns: column names that must all be present.
+        what: name of the kind of file this was expected to be (e.g.
+            "papers_full.csv"), used in the error message.
+
+    Returns:
+        The DataFrame, already read and cleaned by read_csv_clean.
+
+    Raises:
+        InputError: for any of the three cases described above.
+    """
+    if not Path(path).exists():
+        raise InputError(f"{what} not found at '{path}'. Check the path given.")
+    try:
+        df = read_csv_clean(path)
+    except Exception as exc:
+        raise InputError(f"Could not read '{path}' as {what}: {exc}") from exc
+    missing = [c for c in required_columns if c not in df.columns]
+    if missing:
+        raise InputError(
+            f"'{path}' does not look like a valid {what}: missing column(s) "
+            f"{', '.join(missing)}. Check that the path given points to the right file."
+        )
+    return df
+
 
 def _norm_id(x):
     """
@@ -174,7 +242,7 @@ def _collect_generation_entries(
         citing_entries = _fetch_all_citing_entries(node["ScopusID"], key_pool, sleep_time)
         filtered = [
             e for e in citing_entries
-            if e["ScopusID"] and e["Year"] is not None and node["Year"] <= e["Year"]
+            if e["ScopusID"] and e["Year"] is not None and node["Year"] <= e["Year"] <= 2023
         ]
         if debug:
             print(f"      [gen {generation}] Node {node['node_id']} (Scopus {node['ScopusID']}, "
@@ -686,7 +754,7 @@ def _reconstruct_root_metrics_from_detail(
 def compute_forward_citations(
     papers_full_csv: Union[str, Path],
     mesh_descriptors_xml: Union[str, Path],
-    output_dir: Union[str, Path],
+    citations_details_csv: Union[str, Path],
     api_keys: Union[str, list, tuple],
     pubmed_api_key: Optional[str] = None,
     sleep_time: float = 0.2,
@@ -706,13 +774,24 @@ def compute_forward_citations(
     immediately with no retry, saving the progress made so far to both
     CSVs.
 
+    Connection failures (SSLError, ConnectionError, Timeout, etc.): each
+    individual request already retries up to 5 times with exponential
+    backoff inside _do_request. If those retries are also exhausted, the
+    progress made so far is saved to both CSVs the same way as on a
+    quota exhaustion, and the run stops — rerun with --resume-forward
+    to pick up where it left off.
+
     Args:
         papers_full_csv: path to a papers_full.csv that already has
             PMID/Category/x/y/TI computed (stages 1-2 of the pipeline,
             see main.py). It is OVERWRITTEN (TD/TY/TC/SearchStatus
             columns).
         mesh_descriptors_xml: path to the NLM's desc*.xml.
-        output_dir: folder where citations_details.csv is saved.
+        citations_details_csv: path to citations_details.csv. If it
+            already exists and resume=True, it is read to skip original
+            articles already processed; either way it is OVERWRITTEN
+            with the updated detail rows. Its parent folder is created
+            if it does not exist yet.
         api_key: Elsevier/Scopus API key.
         pubmed_api_key: NCBI/PubMed E-utilities API key. It is OPTIONAL:
             without it, E-utilities still works the same, just limited
@@ -723,23 +802,36 @@ def compute_forward_citations(
             whether pubmed_api_key is set: 0.3 s with a key (~10 req/s),
             0.5 s without one (~2 req/s, with margin under NCBI's real
             3 req/s limit).
-        resume: if True, reuses an existing citations_details.csv and
-            skips original articles already processed.
+        resume: if True, skips original articles whose SearchStatus in
+            papers_full.csv is already PROCESSED_REACHED_H,
+            PROCESSED_NOT_REACHED_H or PROCESSED_NO_CITATIONS, and, if an
+            existing citations_details.csv is found, also reuses its
+            detail rows and citation-lookup caches.
         verbose: if True, prints progress to the console.
 
     Returns:
         DataFrame with the final content of citations_details.csv.
+
+    Raises:
+        InputError: if papers_full_csv does not exist, cannot be read as
+            a CSV, or is missing a column this function needs
+            (_PAPERS_FULL_REQUIRED_COLUMNS); or if citations_details_csv
+            already exists but is missing a column the resume logic
+            needs (_CITATIONS_DETAILS_REQUIRED_COLUMNS) -- for example,
+            because --citations-details was pointed, by mistake, at the
+            wrong file. Either way, the message names the file and the
+            missing column(s) instead of letting the pipeline crash
+            further down with a confusing KeyError.
     """
     if pubmed_sleep_time is None:
         pubmed_sleep_time = 0.3 if pubmed_api_key else 0.5
     key_pool = ApiKeyPool(api_keys)
 
     papers_full_path = Path(papers_full_csv)
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
-    detail_csv_path = output_dir_path / "citations_details.csv"
+    detail_csv_path = Path(citations_details_csv)
+    detail_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
-    df = read_csv_clean(papers_full_path)
+    df = _read_csv_clean_validated(papers_full_path, _PAPERS_FULL_REQUIRED_COLUMNS, "papers_full.csv")
     df["PMID"] = df["PMID"].astype(str).str.replace(r"\.0$|,0$", "", regex=True).replace("nan", None)
     df["TD"] = df.get("TD", pd.Series(dtype="object")).astype("object")
     df["TY"] = df.get("TY", pd.Series(dtype="object")).astype("object")
@@ -761,7 +853,7 @@ def compute_forward_citations(
                 "Category": orow.get("Category"),
             }
 
-    print(f"Computing forward citations from '{papers_full_csv}'")
+    print(f"Computing forward citations from '{papers_full_csv}' and '{citations_details_csv}'")
     citations_cache: dict[str, dict] = {}
     doi_pmid_cache: dict[str, str] = {}
     scopus_pmid_cache: dict[str, str] = {}
@@ -774,10 +866,33 @@ def compute_forward_citations(
     ui_index, name_index = load_mesh_indices(mesh_descriptors_xml)
 
     all_rows: list[dict] = []
-    done_original_ids: set[str] = set()
     row_index = {}
+
+    # A root is considered "done" (skipped, reused as is) purely from its
+    # own SearchStatus in papers_full.csv (`df`, already loaded above):
+    # any of these three "PROCESSED_*" values means its citation search
+    # already completed in an earlier run, with TD/TY/TC already saved —
+    # regardless of whether it reached H, did not reach it, or had no
+    # citations to explore at all.
+    done_original_ids: set[str] = set()
+    if resume:
+        done_original_ids = set(
+            df.loc[
+                df["SearchStatus"].isin([
+                    "PROCESSED_REACHED_H",
+                    "PROCESSED_NOT_REACHED_H",
+                    "PROCESSED_NO_CITATIONS",
+                ]),
+                "ScopusID",
+            ].astype(str)
+        )
+        if verbose and done_original_ids:
+            print(f"Resuming: {len(done_original_ids)} original articles already processed, skipping them.")
+
     if resume and detail_csv_path.exists():
-        prev = read_csv_clean(detail_csv_path)
+        prev = _read_csv_clean_validated(
+            detail_csv_path, _CITATIONS_DETAILS_REQUIRED_COLUMNS, "citations_details.csv",
+        )
         all_rows = prev.to_dict("records")
         row_index = {
             (
@@ -791,22 +906,22 @@ def compute_forward_citations(
             for i, r in enumerate(all_rows)
         }
 
-        # A root is considered "done" (skipped) if it already has rows
-        # in citations_details.csv: it is reused as is, with no
-        # reprocessing.
-        done_original_ids = set(prev["ScopusID"].astype(str))
-
         prev_citations_cache, prev_doi_pmid_cache, prev_scopus_pmid_cache = _build_reuse_caches_from_prev(prev)
         citations_cache.update(prev_citations_cache)
         doi_pmid_cache.update(prev_doi_pmid_cache)
         scopus_pmid_cache.update(prev_scopus_pmid_cache)
 
-        if verbose and done_original_ids:
-            print(f"Resuming: {len(done_original_ids)} original articles already processed, skipping them.")
         if verbose and citations_cache:
             print(f"Citation cache recovered: {len(citations_cache)} PMIDs, "
                   f"{len(doi_pmid_cache)} DOIs, {len(scopus_pmid_cache)} ScopusIDs already computed.")
 
+        # Safety net: a "done" root's TD/TY/TC should already be set in
+        # papers_full.csv (that is exactly what earned it its PROCESSED_*
+        # status in the first place), but if citations_details.csv is
+        # somehow ahead of papers_full.csv (e.g. a manual edit, or a
+        # previous save interrupted between the two files), it is
+        # reconstructed here from citations_details.csv instead of being
+        # left empty.
         n_reconstructed = 0
         for ScopusID in done_original_ids:
             match = df.index[df["ScopusID"] == ScopusID]
@@ -898,6 +1013,20 @@ def compute_forward_citations(
             print(f"[STOPPED] {exc.service} quota exhausted (HTTP 429).")
             print(f"         Reset reported by the API: {exc.reset_human()}")
             print(f"         Progress saved to '{detail_csv_path}' and '{papers_full_path}'.")
+            return pd.DataFrame(all_rows)
+        except requests.exceptions.RequestException as exc:
+            # The connection-retry loop inside _do_request (5 attempts
+            # with exponential backoff, same key throughout) has been
+            # exhausted without ever getting a response — a genuine
+            # connection failure (SSLError, ConnectionError, Timeout,
+            # etc.), not a quota/rate-limit response, so there is no
+            # key to rotate to. Stops the same way a quota exhaustion
+            # does, so progress is never lost to an unhandled crash.
+            _save_progress()
+            print()
+            print(f"[STOPPED] Connection failure ({type(exc).__name__}): {exc}")
+            print(f"         Progress saved to '{detail_csv_path}' and '{papers_full_path}'.")
+            print("         Rerun with --resume-forward to continue from here.")
             return pd.DataFrame(all_rows)
 
         for new_row in detail_rows:

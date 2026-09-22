@@ -110,6 +110,16 @@ MeSH classification. --pubmed-api-key is optional in those same modes
 (see the comment next to its argparse.add_argument, further below, for
 why). Mode 4 needs none of the three, precisely because it does not
 touch the network or reclassify anything.
+
+All three of modes 1, 2 and 3 also run stage 3 (forward citations), so
+all three end up with a citations_details.csv, but only mode 3 requires
+--citations-details on the command line: in modes 1/2 papers_full.csv
+itself always lives inside --output-dir, so citations_details.csv
+defaults to that same folder when --citations-details is not given (see
+run_from_scopus_resolution); in mode 3, papers_full.csv can be anywhere
+(it is a standalone path, not necessarily under --output-dir), so there
+is no such folder to default to and it must be given explicitly, the
+same way papers_full.csv already is.
 """
 from __future__ import annotations
 
@@ -504,6 +514,7 @@ def run_from_scopus_resolution(
     output_dir: Union[str, Path],
     scopus_api_keys: Union[str, list, tuple],
     mesh_descriptors_xml: Union[str, Path],
+    citations_details_csv: Optional[Union[str, Path]] = None,
     pubmed_api_key: Optional[str] = None,
     sleep_time: float = 0.2,
     author_id_column: str = "AuthorID",
@@ -542,6 +553,11 @@ def run_from_scopus_resolution(
             format in both modes 1 and 2).
         output_dir: folder where papers_full.csv is created (or already
             exists) along with the rest of the results.
+        citations_details_csv: path where citations_details.csv is
+            (re)written by stage 3. OPTIONAL here (unlike in mode 3):
+            since papers_full.csv itself always lives inside output_dir
+            in modes 1/2, if this is not given it defaults to
+            output_dir/citations_details.csv, the same folder.
         scopus_api_keys: one or more Elsevier/Scopus API keys (see
             ApiKeyPool in scopus_to_pmid.py for rotation across several).
         pubmed_api_key: NCBI/PubMed E-utilities API key. OPTIONAL:
@@ -565,6 +581,8 @@ def run_from_scopus_resolution(
     output_dir_path = Path(output_dir)
     output_dir_path.mkdir(parents=True, exist_ok=True)
     papers_full_path = output_dir_path / PAPERS_FULL_FILENAME
+    if citations_details_csv is None:
+        citations_details_csv = output_dir_path / "citations_details.csv"
 
     # --- Stage 1: ScopusID -> PMID/DOI/Title/MeSH (resume-aware) ---
     # Note: only `sleep_time` is passed here (the pause between requests
@@ -598,7 +616,7 @@ def run_from_scopus_resolution(
     compute_forward_citations(
         papers_full_csv=papers_full_path,
         mesh_descriptors_xml=mesh_descriptors_xml,
-        output_dir=output_dir_path,
+        citations_details_csv=citations_details_csv,
         api_keys=scopus_api_keys,
         pubmed_api_key=pubmed_api_key,
         sleep_time=sleep_time,
@@ -615,6 +633,7 @@ def run_from_scopus_resolution(
 def run_from_forward_citations(
     papers_full_csv: Union[str, Path],
     output_dir: Union[str, Path],
+    citations_details_csv: Union[str, Path],
     scopus_api_keys: Union[str, list, tuple],
     mesh_descriptors_xml: Union[str, Path],
     pubmed_api_key: Optional[str] = None,
@@ -631,8 +650,12 @@ def run_from_forward_citations(
     Args:
         papers_full_csv: path to an already-classified papers_full.csv
             (with PMID/Category/x/y/TI present).
-        output_dir: folder where citations_details.csv and the rest of
-            this run's results are saved.
+        output_dir: folder where the rest of this run's results
+            (results_by_author.csv, authors_triangle.html,
+            summary_report.txt) are saved.
+        citations_details_csv: path where citations_details.csv is
+            (re)written by stage 3. Not necessarily inside output_dir:
+            it is given explicitly, the same way papers_full_csv is.
         scopus_api_keys, pubmed_api_key, mesh_descriptors_xml,
             sleep_time: same parameters as in run_from_scopus_resolution,
             needed because forward citations also query Scopus/PubMed
@@ -648,7 +671,7 @@ def run_from_forward_citations(
     compute_forward_citations(
         papers_full_csv=papers_full_path,
         mesh_descriptors_xml=mesh_descriptors_xml,
-        output_dir=output_dir_path,
+        citations_details_csv=citations_details_csv,
         api_keys=scopus_api_keys,
         pubmed_api_key=pubmed_api_key,
         sleep_time=sleep_time,
@@ -763,6 +786,17 @@ def _parse_args() -> argparse.Namespace:
 
     parser.add_argument("--sleep-time", type=float, default=0.2, help="Pause (s) between Scopus/PubMed requests.")
     parser.add_argument("--output-dir", default="results", help="Output folder for all results.")
+    # Explicit path to citations_details.csv, the same way papers_full.csv
+    # is given explicitly in mode 3 (--resume-forward). REQUIRED only for
+    # mode 3: in modes 1/2 papers_full.csv itself always lives inside
+    # --output-dir, so citations_details.csv defaults to that same
+    # folder (see run_from_scopus_resolution) when this is not given.
+    # In mode 3, papers_full.csv can be anywhere, so there is no such
+    # folder to default to and it must be given explicitly.
+    parser.add_argument("--citations-details", help="Path to citations_details.csv. Required for mode 3 (--resume-forward). "
+                              "Optional for modes 1/2 (--scopus-input/--resume-scopus): defaults to "
+                              "<output-dir>/citations_details.csv. Either way, it is read, if it already "
+                              "exists, to resume, and (re)written with the updated detail rows.")
 
     args = parser.parse_args()
 
@@ -780,6 +814,13 @@ def _parse_args() -> argparse.Namespace:
         # req/s) by NCBI.
         if not args.mesh_descriptors:
             parser.error("--mesh-descriptors is required for this mode.")
+        # --citations-details is required only for mode 3
+        # (--resume-forward): in modes 1/2 it defaults to
+        # <output-dir>/citations_details.csv when not given (see
+        # run_from_scopus_resolution), since papers_full.csv itself
+        # always lives inside --output-dir in those two modes.
+        if args.resume_forward and not args.citations_details:
+            parser.error("--citations-details is required for mode 3 (--resume-forward).")
     return args
 
 
@@ -798,6 +839,7 @@ if __name__ == "__main__":
             run_from_forward_citations(
                 papers_full_csv=args.resume_forward,
                 output_dir=args.output_dir,
+                citations_details_csv=args.citations_details,
                 scopus_api_keys=args.scopus_api_key,
                 pubmed_api_key=args.pubmed_api_key,
                 mesh_descriptors_xml=args.mesh_descriptors,
@@ -815,6 +857,7 @@ if __name__ == "__main__":
             run_from_scopus_resolution(
                 scopus_input_or_existing=source,
                 output_dir=args.output_dir,
+                citations_details_csv=args.citations_details,
                 author_id_column=args.author_id_column,
                 scopus_id_column=args.scopus_id_column,
                 year_column=args.year_column,
