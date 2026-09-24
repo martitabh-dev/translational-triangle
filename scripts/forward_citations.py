@@ -242,7 +242,7 @@ def _collect_generation_entries(
         citing_entries = _fetch_all_citing_entries(node["ScopusID"], key_pool, sleep_time)
         filtered = [
             e for e in citing_entries
-            if e["ScopusID"] and e["Year"] is not None and node["Year"] <= e["Year"] <= 2023
+            if e["ScopusID"] and e["Year"] is not None and node["Year"] <= e["Year"]
         ]
         if debug:
             print(f"      [gen {generation}] Node {node['node_id']} (Scopus {node['ScopusID']}, "
